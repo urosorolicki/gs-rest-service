@@ -2,98 +2,40 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'gs-rest-service'
-        DOCKER_TAG = "${BUILD_NUMBER}"
-        SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/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'
-        MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
-    }
-
-    triggers {
-        pollSCM('H/5 * * * *')
+        SLACK_WEBHOOK = 'https://hooks.slack.com/services/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'
+        IMAGE_NAME = 'gs-rest-service'
+        CONTAINER_PORT = '7777'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                script {
-                    slackSend(":construction: Build #${BUILD_NUMBER} started on branch ${env.BRANCH_NAME ?: 'unknown'}")
-                }
-                checkout scm
-                script {
-                    env.GIT_COMMIT_MSG = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
-                    env.GIT_AUTHOR = sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
-                }
+                git 'https://github.com/urosorolicki/gs-rest-service'
             }
         }
 
-        stage('Build & Test') {
+        stage('Build') {
             steps {
                 dir('complete') {
-                    // Build i test unutar Maven Docker containera da ne zavisi od lokalnog Maven-a
-                    script {
-                        docker.image('maven:3.8.5-openjdk-17').inside {
-                            sh 'mvn clean package -B'
-                        }
-                    }
-                }
-            }
-            post {
-                success {
-                    script {
-                        slackSend(":white_check_mark: Build and tests succeeded for build #${BUILD_NUMBER}")
-                    }
-                }
-                failure {
-                    script {
-                        slackSend(":x: Build or tests failed for build #${BUILD_NUMBER}")
-                    }
-                    error("Build failed")
+                    sh './mvnw clean package -DskipTests'
                 }
             }
         }
 
         stage('Docker Build') {
             steps {
-                dir('complete') {
-                    script {
-                        dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                    }
-                }
+                sh """
+                docker build -t ${IMAGE_NAME} ./complete
+                """
             }
         }
 
-        stage('Docker Test') {
+        stage('Docker Run Test') {
             steps {
                 script {
                     sh """
-                    docker stop gs-rest-service-test || true
-                    docker rm gs-rest-service-test || true
-                    docker run -d --name gs-rest-service-test -p 7777:7777 ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    sleep 20
-                    curl -f http://localhost:7777/greeting
-                    docker stop gs-rest-service-test
-                    docker rm gs-rest-service-test
-                    """
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            slackSend(":tada: Build #${BUILD_NUMBER} uspešno završen!\nAutor: ${env.GIT_AUTHOR}\nPoruka: ${env.GIT_COMMIT_MSG}")
-        }
-        failure {
-            slackSend(":warning: Build #${BUILD_NUMBER} nije uspeo.\nAutor: ${env.GIT_AUTHOR}\nPoruka: ${env.GIT_COMMIT_MSG}")
-        }
-        always {
-            cleanWs()
-        }
-    }
-}
-
-def slackSend(String message) {
-    sh """
-    curl -X POST -H 'Content-type: application/json' --data '{"text":"${message}"}' ${SLACK_WEBHOOK_URL}
-    """
-}
+                    docker run -d --name test_container -p ${CONTAINER_PORT}:${CONTAINER_PORT} ${IMAGE_NAME}
+                    sleep 10
+                    curl -f http://localhost:${CONTAINER_PORT}/greeting || (echo "App not responding" && exit 1)
+                    docker stop test_container
+                    docker rm test_container
