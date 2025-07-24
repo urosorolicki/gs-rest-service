@@ -16,7 +16,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    slackSend(":construction: Build #${BUILD_NUMBER} started on branch ${env.BRANCH_NAME}")
+                    slackSend(":construction: Build #${BUILD_NUMBER} started on branch ${env.BRANCH_NAME ?: 'unknown'}")
                 }
                 checkout scm
                 script {
@@ -29,7 +29,12 @@ pipeline {
         stage('Build & Test') {
             steps {
                 dir('complete') {
-                    sh 'mvn clean package -B'
+                    // Build i test unutar Maven Docker containera da ne zavisi od lokalnog Maven-a
+                    script {
+                        docker.image('maven:3.8.5-openjdk-17').inside {
+                            sh 'mvn clean package -B'
+                        }
+                    }
                 }
             }
             post {
@@ -63,7 +68,7 @@ pipeline {
                     sh """
                     docker stop gs-rest-service-test || true
                     docker rm gs-rest-service-test || true
-                    docker run -d --name gs-rest-service-test -p 7777:777 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker run -d --name gs-rest-service-test -p 7777:7777 ${DOCKER_IMAGE}:${DOCKER_TAG}
                     sleep 20
                     curl -f http://localhost:7777/greeting
                     docker stop gs-rest-service-test
