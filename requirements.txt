@@ -1,0 +1,10 @@
+# Deployment script dependencies
+paramiko>=3.4.0
+requests>=2.31.0
+
+# Monitoring script dependencies  
+requests>=2.31.0
+
+# Dashboard dependencies
+flask>=3.0.0
+requests>=2.31.0

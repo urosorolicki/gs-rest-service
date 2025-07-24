@@ -1,0 +1,111 @@
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'DOCKER_IMAGE', defaultValue: 'gs-rest-service:latest', description: 'Docker image to deploy')
+        string(name: 'BUILD_NUMBER', defaultValue: '1', description: 'Build number from CI job')
+    }
+    
+    environment {
+        SLACK_CHANNEL_CI = '#gs-rest-service-ci'
+        DEPLOYMENT_SERVER = credentials('deployment-server-ssh')
+        DOCKER_REGISTRY = credentials('docker-registry')
+    }
+    
+    stages {
+        stage('Prepare Deployment') {
+            steps {
+                script {
+                    slackSend(
+                        channel: env.SLACK_CHANNEL_CI,
+                        color: 'warning',
+                        message: ":rocket: Starting deployment of build #${params.BUILD_NUMBER}\n" +
+                                "Image: ${params.DOCKER_IMAGE}"
+                    )
+                }
+            }
+        }
+        
+        stage('Deploy to Server') {
+            steps {
+                script {
+                    // Create deployment script
+                    writeFile file: 'deploy.sh', text: """#!/bin/bash
+set -e
+
+echo "Deploying ${params.DOCKER_IMAGE}..."
+
+# Stop existing container
+docker stop gs-rest-service || true
+docker rm gs-rest-service || true
+
+# Pull latest image
+docker pull ${params.DOCKER_IMAGE}
+
+# Run new container
+docker run -d \\
+    --name gs-rest-service \\
+    --restart unless-stopped \\
+    -p 777:777 \\
+    -e SPRING_PROFILES_ACTIVE=production \\
+    ${params.DOCKER_IMAGE}
+
+# Wait for service to start
+sleep 30
+
+# Health check
+curl -f http://localhost:777/greeting || exit 1
+
+echo "Deployment completed successfully!"
+"""
+                    
+                    // Make script executable
+                    sh 'chmod +x deploy.sh'
+                    
+                    // Deploy via SSH
+                    sshagent(['deployment-server-ssh']) {
+                        sh """
+                            scp deploy.sh ${DEPLOYMENT_SERVER_USR}@${DEPLOYMENT_SERVER_PSW}:/tmp/
+                            ssh ${DEPLOYMENT_SERVER_USR}@${DEPLOYMENT_SERVER_PSW} 'bash /tmp/deploy.sh'
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    // Verify service is running
+                    sshagent(['deployment-server-ssh']) {
+                        sh """
+                            ssh ${DEPLOYMENT_SERVER_USR}@${DEPLOYMENT_SERVER_PSW} 'curl -f http://localhost:777/greeting'
+                        """
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            slackSend(
+                channel: env.SLACK_CHANNEL_CI,
+                color: 'good',
+                message: ":white_check_mark: Deployment of build #${params.BUILD_NUMBER} completed successfully!\n" +
+                        "Service is now running on port 777\n" +
+                        "Image: ${params.DOCKER_IMAGE}"
+            )
+        }
+        
+        failure {
+            slackSend(
+                channel: env.SLACK_CHANNEL_CI,
+                color: 'danger',
+                message: ":x: Deployment of build #${params.BUILD_NUMBER} failed!\n" +
+                        "Image: ${params.DOCKER_IMAGE}\n" +
+                        "Check: ${env.BUILD_URL}"
+            )
+        }
+    }
+}
