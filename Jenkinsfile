@@ -9,7 +9,7 @@ pipeline {
     }
 
     triggers {
-        pollSCM('H/5 * * * *') // koristi webhook ako možeš, u suprotnom ovo
+        pollSCM('H/5 * * * *')
     }
 
     stages {
@@ -19,7 +19,6 @@ pipeline {
                     slackSend(":construction: Build #${BUILD_NUMBER} started on branch ${env.BRANCH_NAME}")
                 }
                 checkout scm
-
                 script {
                     env.GIT_COMMIT_MSG = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
                     env.GIT_AUTHOR = sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
@@ -70,36 +69,6 @@ pipeline {
                     docker stop gs-rest-service-test
                     docker rm gs-rest-service-test
                     """
-                }
-            }
-        }
-
-        stage('Deploy') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'master'
-                }
-            }
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: '723ae88a-a5b9-4a29-9c79-a5bc81dd63f4',
-                    usernameVariable: 'GIT_USERNAME',
-                    passwordVariable: 'GIT_PASSWORD'
-                )]) {
-                    sh """
-                    git config user.name "Jenkins CI"
-                    git config user.email "jenkins@example.com"
-                    git checkout ${env.BRANCH_NAME}
-                    echo "Triggering redeploy from Jenkins at $(date)" > trigger.txt
-                    git add trigger.txt
-                    git commit -m "Jenkins triggered redeploy for build #${BUILD_NUMBER}" || echo "No changes to commit"
-                    git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/urosorolicki/gs-rest-service.git ${env.BRANCH_NAME}
-                    """
-
-                    script {
-                        slackSend(":rocket: GitHub push za deploy uspešan za build #${BUILD_NUMBER}")
-                    }
                 }
             }
         }
