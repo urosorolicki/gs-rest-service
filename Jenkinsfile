@@ -2,9 +2,10 @@ pipeline {
     agent any
 
     environment {
-        SLACK_WEBHOOK = 'https://hooks.slack.com/services/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'
-        IMAGE_NAME = 'gs-rest-service'
-        CONTAINER_PORT = '7777'
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds') // ID tvojih Docker Hub kredencijala u Jenkinsu
+        SLACK_WEBHOOK = "https://hooks.slack.com/services/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"
+        IMAGE_NAME = "urosorolicki/gs-rest-service"
+        IMAGE_TAG = "latest"
     }
 
     stages {
@@ -22,20 +23,28 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                sh """
-                docker build -t ${IMAGE_NAME} ./complete
-                """
-            }
-        }
-
-        stage('Docker Run Test') {
+        stage('Docker Build & Push') {
             steps {
                 script {
-                    sh """
-                    docker run -d --name test_container -p ${CONTAINER_PORT}:${CONTAINER_PORT} ${IMAGE_NAME}
-                    sleep 10
-                    curl -f http://localhost:${CONTAINER_PORT}/greeting || (echo "App not responding" && exit 1)
-                    docker stop test_container
-                    docker rm test_container
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                        def appImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}", './complete')
+                        appImage.push()
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            sh """
+            curl -X POST -H 'Content-type: application/json' --data '{"text":":white_check_mark: Build i Docker push uspešni!"}' ${SLACK_WEBHOOK}
+            """
+        }
+        failure {
+            sh """
+            curl -X POST -H 'Content-type: application/json' --data '{"text":":x: Build ili Docker push nisu uspeli."}' ${SLACK_WEBHOOK}
+            """
+        }
+    }
+}
