@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds') // ID tvojih Docker Hub kredencijala u Jenkinsu
-        SLACK_WEBHOOK = "https://hooks.slack.com/services/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"
-        IMAGE_NAME = "urosorolicki/gs-rest-service"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-token-id')
+        IMAGE_NAME = "orolickiuros/gs-rest-service"
         IMAGE_TAG = "latest"
     }
 
@@ -26,7 +25,7 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-token-id') {
                         def appImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}", './complete')
                         appImage.push()
                     }
@@ -38,12 +37,12 @@ pipeline {
     post {
         success {
             sh """
-            curl -X POST -H 'Content-type: application/json' --data '{"text":":white_check_mark: Build i Docker push uspešni!"}' ${SLACK_WEBHOOK}
+            curl -X POST -H 'Content-type: application/json' --data '{"text":":white_check_mark: Build i Docker push uspešni!"}' ${env.SLACK_WEBHOOK}
             """
         }
         failure {
             sh """
-            curl -X POST -H 'Content-type: application/json' --data '{"text":":x: Build ili Docker push nisu uspeli."}' ${SLACK_WEBHOOK}
+            curl -X POST -H 'Content-type: application/json' --data '{"text":":x: Build ili Docker push nisu uspeli."}' ${env.SLACK_WEBHOOK}
             """
         }
     }
