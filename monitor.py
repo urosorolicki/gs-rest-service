@@ -2,10 +2,10 @@ import time
 import requests
 
 URL = 'https://gs-rest-service-mphw.onrender.com/greeting'
-INTERVAL = 30  # u sekundama
+INTERVAL = 30
 STATUS_UP = True
 
-SLACK_WEBHOOK = 'https://hooks.slack.com/services/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'
+SLACK_WEBHOOK = 'https://hooks.slack.com/services/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'
 
 def send_slack(message):
     payload = {"text": message}
