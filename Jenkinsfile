@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-token-id')
+        SLACK_WEBHOOK = credentials('SLACK_WEBHOOK')
         IMAGE_NAME = "orolickiuros/gs-rest-service"
         IMAGE_TAG = "latest"
     }
@@ -17,6 +18,7 @@ pipeline {
         stage('Build') {
             steps {
                 dir('complete') {
+                    sh 'chmox +x ./mvnw'
                     sh './mvnw clean package -DskipTests'
                 }
             }
