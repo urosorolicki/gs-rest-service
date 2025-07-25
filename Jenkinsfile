@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-token-id')
         SLACK_WEBHOOK = credentials('SLACK_WEBHOOK')
@@ -11,10 +10,9 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/urosorolicki/gs-rest-service'
+                git 'https://github.com/urosorolicki/gs-rest-service'
             }
         }
-
         stage('Build') {
             steps {
                 dir('complete') {
@@ -23,7 +21,6 @@ pipeline {
                 }
             }
         }
-
         stage('Docker Build & Push') {
             steps {
                 script {
@@ -35,16 +32,15 @@ pipeline {
             }
         }
     }
-
     post {
         success {
             sh """
-            curl -X POST -H 'Content-type: application/json' --data '{"text":":white_check_mark: Build i Docker push uspešni!"}' ${env.SLACK_WEBHOOK}
+            curl -X POST -H 'Content-type: application/json' --data '{"text":":white_check_mark: Build i Docker push uspešni!"}' ${SLACK_WEBHOOK}
             """
         }
         failure {
             sh """
-            curl -X POST -H 'Content-type: application/json' --data '{"text":":x: Build ili Docker push nisu uspeli."}' ${env.SLACK_WEBHOOK}
+            curl -X POST -H 'Content-type: application/json' --data '{"text":":x: Build ili Docker push nisu uspeli."}' ${SLACK_WEBHOOK}
             """
         }
     }
