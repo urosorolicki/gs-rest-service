@@ -36,12 +36,12 @@ pipeline {
     post {
         success {
             bat """
-            curl -X POST -H "Content-type: application/json" --data "{\\"text\\":\\"✔️ Build i Docker push uspešni!\\"}" %SLACK_WEBHOOK%
+            curl -X POST -H "Content-type: application/json" --data "{\\"text\\":\\"Build i Docker push uspešni!\\"}" %SLACK_WEBHOOK%
             """
         }
         failure {
             bat """
-            curl -X POST -H "Content-type: application/json" --data "{\\"text\\":\\"❌ Build ili Docker push nisu uspeli.\\"}" %SLACK_WEBHOOK%
+            curl -X POST -H "Content-type: application/json" --data "{\\"text\\":\\"Build ili Docker push nisu uspeli.\\"}" %SLACK_WEBHOOK%
             """
         }
     }

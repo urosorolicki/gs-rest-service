@@ -1,11 +1,10 @@
-FROM jenkins/jenkins:lts
+FROM maven:3.9.6-eclipse-temurin-17 as builder
+WORKDIR /app
+COPY complete /app
+RUN chmod +x mvnw && ./mvnw clean package -DskipTests
 
-USER root
-
-RUN apt-get update && apt-get install -y curl \
-    && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-24.0.5.tgz -o docker.tgz \
-    && tar --extract --file=docker.tgz --strip-components=1 --directory=/usr/local/bin docker/docker \
-    && chmod +x /usr/local/bin/docker \
-    && rm docker.tgz
-
-USER jenkins
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+EXPOSE 777
+CMD ["java", "-jar", "app.jar", "--server.port=777"]
