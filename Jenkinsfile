@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/urosorolicki/gs-rest-service'
+                git branch: 'main', url: 'https://github.com/urosorolicki/gs-rest-service'
             }
         }
 
